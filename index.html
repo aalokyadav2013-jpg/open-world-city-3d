@@ -1,0 +1,488 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Open World City 3D</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #101820;
+  font-family: Arial, sans-serif;
+  touch-action: none;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+}
+
+#rotate {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: linear-gradient(#142536, #080e16);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.rotate-content {
+  padding: 25px;
+}
+
+.phone {
+  font-size: 75px;
+  display: block;
+  animation: turn 2s infinite ease-in-out;
+}
+
+@keyframes turn {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(90deg); }
+}
+
+#hud {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  display: none;
+  color: white;
+}
+
+#title {
+  position: absolute;
+  top: 12px;
+  left: 15px;
+  font-weight: bold;
+  text-shadow: 1px 2px 5px black;
+}
+
+#controls {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  display: grid;
+  grid-template-columns: 55px 55px 55px;
+  grid-template-rows: 55px 55px;
+  gap: 5px;
+  pointer-events: auto;
+}
+
+.control {
+  background: #142536bb;
+  border: 1px solid #ffffff88;
+  color: white;
+  border-radius: 12px;
+  font-size: 23px;
+  touch-action: none;
+}
+
+#up { grid-column: 2; }
+#left { grid-column: 1; grid-row: 2; }
+#down { grid-column: 2; grid-row: 2; }
+#right { grid-column: 3; grid-row: 2; }
+
+#hint {
+  position: absolute;
+  bottom: 15px;
+  right: 20px;
+  font-size: 12px;
+  text-shadow: 1px 1px 4px black;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="game"></div>
+
+<div id="rotate">
+  <div class="rotate-content">
+    <span class="phone">📱</span>
+    <h2>OPEN WORLD CITY 3D</h2>
+    <p>Please rotate your phone to landscape mode.</p>
+    <p>↻ Rotate your phone to start playing</p>
+  </div>
+</div>
+
+<div id="hud">
+  <div id="title">OPEN WORLD CITY 3D</div>
+
+  <div id="controls">
+    <button class="control" id="up">▲</button>
+    <button class="control" id="left">◀</button>
+    <button class="control" id="down">▼</button>
+    <button class="control" id="right">▶</button>
+  </div>
+
+  <div id="hint">Use buttons or WASD to move</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+
+import * as THREE from "three";
+
+// BASIC SETTINGS
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87b8d8);
+scene.fog = new THREE.Fog(0x87b8d8, 250, 950);
+
+const camera = new THREE.PerspectiveCamera(
+  65,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1500
+);
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true
+});
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+document.getElementById("game").appendChild(renderer.domElement);
+
+// LIGHTING
+
+const sunlight = new THREE.DirectionalLight(0xffffff, 2.2);
+sunlight.position.set(100, 180, 100);
+sunlight.castShadow = true;
+scene.add(sunlight);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x555566, 1.8));
+
+// GROUND
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(1200, 1200),
+  new THREE.MeshStandardMaterial({ color: 0x47734c })
+);
+
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.15;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// CITY SETTINGS
+
+const blockSize = 120;
+const roadWidth = 24;
+
+const buildingColors = [
+  0x9a9a9a,
+  0xc0b6a5,
+  0x777d88,
+  0xb4a28e,
+  0x8a9298,
+  0xd1c6b5
+];
+
+// CREATE ROADS
+
+const roadMaterial = new THREE.MeshStandardMaterial({
+  color: 0x292d32,
+  roughness: 0.95
+});
+
+for (let i = -5; i <= 5; i++) {
+
+  const road1 = new THREE.Mesh(
+    new THREE.PlaneGeometry(1200, roadWidth),
+    roadMaterial
+  );
+
+  road1.rotation.x = -Math.PI / 2;
+  road1.position.set(i * blockSize, 0, 0);
+  scene.add(road1);
+
+  const road2 = new THREE.Mesh(
+    new THREE.PlaneGeometry(roadWidth, 1200),
+    roadMaterial
+  );
+
+  road2.rotation.x = -Math.PI / 2;
+  road2.position.set(0, 0, i * blockSize);
+  scene.add(road2);
+}
+
+// ROAD MARKINGS
+
+const lineMaterial = new THREE.MeshBasicMaterial({
+  color: 0xe5d9a0
+});
+
+for (let i = -5; i <= 5; i++) {
+
+  const line1 = new THREE.Mesh(
+    new THREE.PlaneGeometry(1200, 0.35),
+    lineMaterial
+  );
+
+  line1.rotation.x = -Math.PI / 2;
+  line1.position.set(i * blockSize, 0.04, 0);
+  scene.add(line1);
+
+  const line2 = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.35, 1200),
+    lineMaterial
+  );
+
+  line2.rotation.x = -Math.PI / 2;
+  line2.position.set(0, 0.04, i * blockSize);
+  scene.add(line2);
+}
+
+// CREATE BUILDINGS
+
+function createBuilding(x, z, width, depth, height) {
+
+  const color = buildingColors[
+    Math.floor(Math.random() * buildingColors.length)
+  ];
+
+  const building = new THREE.Mesh(
+    new THREE.BoxGeometry(width, height, depth),
+    new THREE.MeshStandardMaterial({
+      color: color,
+      roughness: 0.85
+    })
+  );
+
+  building.position.set(x, height / 2, z);
+  building.castShadow = true;
+  building.receiveShadow = true;
+
+  scene.add(building);
+
+  // Rooftop
+
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(width + 1, 1, depth + 1),
+    new THREE.MeshStandardMaterial({ color: 0x555555 })
+  );
+
+  roof.position.set(x, height + 0.5, z);
+  scene.add(roof);
+}
+
+// GENERATE CITY
+
+for (let x = -5; x < 5; x++) {
+  for (let z = -5; z < 5; z++) {
+
+    const centerX = x * blockSize + blockSize / 2;
+    const centerZ = z * blockSize + blockSize / 2;
+
+    const count = 2 + Math.floor(Math.random() * 3);
+
+    for (let j = 0; j < count; j++) {
+
+      const bx = centerX + (Math.random() - 0.5) * 65;
+      const bz = centerZ + (Math.random() - 0.5) * 65;
+
+      const width = 18 + Math.random() * 15;
+      const depth = 18 + Math.random() * 15;
+      const height = 20 + Math.random() * 100;
+
+      createBuilding(bx, bz, width, depth, height);
+    }
+  }
+}
+
+// PLAYER
+
+const player = new THREE.Group();
+
+const body = new THREE.Mesh(
+  new THREE.CapsuleGeometry(0.65, 1.1, 4, 8),
+  new THREE.MeshStandardMaterial({ color: 0x243c80 })
+);
+
+body.position.y = 1.4;
+body.castShadow = true;
+player.add(body);
+
+const head = new THREE.Mesh(
+  new THREE.SphereGeometry(0.4, 16, 16),
+  new THREE.MeshStandardMaterial({ color: 0xd6a47d })
+);
+
+head.position.y = 2.5;
+head.castShadow = true;
+player.add(head);
+
+scene.add(player);
+
+// PLAYER START POSITION
+
+player.position.set(0, 0, 20);
+
+// MOVEMENT
+
+const keys = {
+  forward: false,
+  backward: false,
+  left: false,
+  right: false
+};
+
+const speed = 0.65;
+
+function setupButton(id, key) {
+
+  const button = document.getElementById(id);
+
+  button.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    keys[key] = true;
+    button.setPointerCapture(e.pointerId);
+  });
+
+  button.addEventListener("pointerup", () => {
+    keys[key] = false;
+  });
+
+  button.addEventListener("pointercancel", () => {
+    keys[key] = false;
+  });
+
+  button.addEventListener("lostpointercapture", () => {
+    keys[key] = false;
+  });
+}
+
+setupButton("up", "forward");
+setupButton("down", "backward");
+setupButton("left", "left");
+setupButton("right", "right");
+
+// KEYBOARD CONTROLS
+
+window.addEventListener("keydown", e => {
+
+  if (e.key === "w" || e.key === "ArrowUp") keys.forward = true;
+  if (e.key === "s" || e.key === "ArrowDown") keys.backward = true;
+  if (e.key === "a" || e.key === "ArrowLeft") keys.left = true;
+  if (e.key === "d" || e.key === "ArrowRight") keys.right = true;
+
+});
+
+window.addEventListener("keyup", e => {
+
+  if (e.key === "w" || e.key === "ArrowUp") keys.forward = false;
+  if (e.key === "s" || e.key === "ArrowDown") keys.backward = false;
+  if (e.key === "a" || e.key === "ArrowLeft") keys.left = false;
+  if (e.key === "d" || e.key === "ArrowRight") keys.right = false;
+
+});
+
+// CAMERA
+
+const cameraOffset = new THREE.Vector3(0, 6, 10);
+
+camera.position.set(0, 6, 30);
+
+// ORIENTATION DETECTION
+
+function isLandscape() {
+  return window.innerWidth > window.innerHeight;
+}
+
+function updateOrientation() {
+
+  const landscape = isLandscape();
+
+  document.getElementById("rotate").style.display =
+    landscape ? "none" : "flex";
+
+  document.getElementById("hud").style.display =
+    landscape ? "block" : "none";
+}
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  updateOrientation();
+});
+
+window.addEventListener("orientationchange", updateOrientation);
+
+updateOrientation();
+
+// GAME LOOP
+
+function animate() {
+
+  requestAnimationFrame(animate);
+
+  if (isLandscape()) {
+
+    const movement = new THREE.Vector3();
+
+    if (keys.forward) movement.z -= 1;
+    if (keys.backward) movement.z += 1;
+    if (keys.left) movement.x -= 1;
+    if (keys.right) movement.x += 1;
+
+    if (movement.length() > 0) {
+
+      movement.normalize();
+
+      player.position.addScaledVector(movement, speed);
+
+      player.rotation.y = Math.atan2(
+        movement.x,
+        movement.z
+      ) + Math.PI;
+
+    }
+
+    // Follow the player
+
+    const targetCamera = player.position.clone().add(
+      cameraOffset
+    );
+
+    camera.position.lerp(targetCamera, 0.08);
+
+    camera.lookAt(
+      player.position.x,
+      player.position.y + 1.5,
+      player.position.z
+    );
+
+    renderer.render(scene, camera);
+  }
+}
+
+animate();
+
+</script>
+
+</body>
+</html>
